@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Reconhecimento Facial Tela Inteira</title>
+  <title>Reconhecimento Facial Tela Inteira - Câmera Frontal</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js"></script>
   <style>
     body, html {
@@ -23,6 +23,7 @@
       width: 100vw;
       height: 100vh;
       object-fit: cover;
+      transform: scaleX(-1); /* Espelho horizontal para câmera frontal */
     }
 
     #info {
@@ -72,15 +73,15 @@
     const zoomLevels = [1, 2, 3];
 
     const peopleData = {
-      "Mariana": { name: "Mariana Ximenes", description: "Atriz brasileira, conhecida por seus papéis na TV." },
-      "Morgan": { name: "Morgan Freeman", description: "Ator de cinema, filantropo, ganhador de Oscar." },
-      "Jean": { name: "Jean", description: "Profissional de tecnologia e inovação." }
+      pessoa_0: { name: "Mariana Ximenes", description: "Atriz brasileira, conhecida por seus papéis na TV." },
+      pessoa_1: { name: "Morgan Freeman", description: "Ator de cinema, filantropo, ganhador de Oscar." },
+      pessoa_2: { name: "Jean Tedesqui", description: "Profissional de tecnologia e inovação." }
     };
 
     async function setupCamera() {
       const constraints = {
         video: {
-          facingMode: { exact: "environment" },
+          facingMode: "user",  // Câmera frontal
           width: { ideal: 1280 },
           height: { ideal: 720 },
           zoom: currentZoom
@@ -107,7 +108,7 @@
     zoomBtn.addEventListener('click', toggleZoom);
 
     async function loadModel() {
-      const model = await tf.loadGraphModel('model/model.json'); // Substitua pelo seu caminho correto
+      const model = await tf.loadGraphModel('./model/model.json'); // Substitua pelo caminho correto
       return model;
     }
 
@@ -146,7 +147,6 @@
         }
 
         tf.dispose([imgTensor, ...predictions]);
-
       }, 1000);
     }
 
