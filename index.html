@@ -136,7 +136,7 @@
             const className = prediction[i].className;
             const prob = prediction[i].probability;
 
-            if (className.toLowerCase().includes("jean") && prob > 0.5) {
+            if (className.toLowerCase().includes("jean") && prob > 0.7) {
                 if (!alertaMostrado) {
                     document.getElementById("alerta").innerHTML = "🚨 JEAN TEDESQUI, CRIMINOSO CLASSE A, CONDENADO A 50 ANOS, STATUS ATUAL: FORAGIDO! 🚨";
                     alertaMostrado = true;
