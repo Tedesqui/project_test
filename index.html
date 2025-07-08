@@ -23,7 +23,7 @@
 
     #webcam-container {
       width: 100vw;
-      height: 65vh; /* aumentei 30% */
+      height: 65vh;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -35,29 +35,21 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      border: 10px solid #00f; /* caixa azul padrão */
+      border: 10px solid green; /* Inicialmente verde */
       border-radius: 12px;
       box-sizing: border-box;
     }
 
     #alerta {
       margin-top: 10px;
-      font-size: 140px; /* 5x maior */
+      font-size: 70px; /* Metade do tamanho anterior */
       font-weight: bold;
       color: red;
       text-align: center;
     }
 
     #label-container {
-      margin-top: 10px;
-      background: rgba(0,0,0,0.7);
-      padding: 12px 20px;
-      border-radius: 10px;
-      font-size: 22px;
-    }
-
-    #label-container div {
-      color: #000; /* nomes em preto */
+      display: none; /* Esconde nomes e probabilidades */
     }
 
     .footer-buttons {
@@ -97,11 +89,11 @@
 
   <script type="text/javascript">
     const URL = "https://teachablemachine.withgoogle.com/models/BZaioL5ST/";
-    let model, webcam, labelContainer, maxPredictions;
+    let model, webcam, maxPredictions;
     let currentZoom = 1;
     const zoomLevels = [1, 2, 3];
     let alertaMostrado = false;
-    let bordaVermelha = false;
+    let bordaMudada = false;
 
     async function init() {
         const modelURL = URL + "model.json";
@@ -117,11 +109,6 @@
         window.requestAnimationFrame(loop);
 
         document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) {
-            const div = document.createElement("div");
-            labelContainer.appendChild(div);
-        }
 
         document.getElementById("startButton").style.display = 'none';
     }
@@ -148,21 +135,15 @@
         for (let i = 0; i < maxPredictions; i++) {
             const className = prediction[i].className;
             const prob = prediction[i].probability;
-            const text = `${className}: ${prob.toFixed(2)}`;
-            labelContainer.childNodes[i].innerHTML = text;
 
-            // cor preta nos nomes
-            labelContainer.childNodes[i].style.color = "#000";
-
-            // Se Jean > 0.5 e ainda não mostrou alerta
             if (className.toLowerCase().includes("jean") && prob > 0.5) {
                 if (!alertaMostrado) {
-                    document.getElementById("alerta").innerHTML = "🚨 CRIMINOSO CLASSE A, CONDENADO A 50 ANOS, STATUS ATUAL: FORAGIDO! 🚨";
+                    document.getElementById("alerta").innerHTML = "🚨 JEAN TEDESQUI, CRIMINOSO CLASSE A, CONDENADO A 50 ANOS, STATUS ATUAL: FORAGIDO! 🚨";
                     alertaMostrado = true;
                 }
-                if (!bordaVermelha) {
+                if (!bordaMudada) {
                     document.querySelector('#webcam-container canvas').style.border = '10px solid red';
-                    bordaVermelha = true;
+                    bordaMudada = true;
                 }
             }
         }
