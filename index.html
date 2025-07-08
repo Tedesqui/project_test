@@ -1,162 +1,59 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Reconhecimento Facial Tela Inteira - Câmera Frontal</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js"></script>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background-color: #000;
-      font-family: Arial, sans-serif;
-      color: #fff;
-      height: 100%;
-      width: 100%;
-    }
+<div>Teachable Machine Image Model</div>
+<button type="button" onclick="init()">Start</button>
+<div id="webcam-container"></div>
+<div id="label-container"></div>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script type="text/javascript">
+    // More API functions here:
+    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
 
-    video {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      object-fit: cover;
-      transform: scaleX(-1); /* Espelho horizontal para câmera frontal */
-    }
+    // the link to your model provided by Teachable Machine export panel
+    const URL = "https://teachablemachine.withgoogle.com/models/BZaioL5ST/";
 
-    #info {
-      position: absolute;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 12px 20px;
-      background: rgba(0,0,0,0.7);
-      border-radius: 10px;
-      font-size: 18px;
-      text-align: center;
-      max-width: 90%;
-    }
+    let model, webcam, labelContainer, maxPredictions;
 
-    #zoomBtn {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 15px 25px;
-      border-radius: 12px;
-      background: #007bff;
-      border: none;
-      color: #fff;
-      font-size: 20px;
-      cursor: pointer;
-    }
+    // Load the image model and setup the webcam
+    async function init() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
 
-    #zoomBtn:hover {
-      background: #0056b3;
-    }
-  </style>
-</head>
-<body>
+        // load the model and metadata
+        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
+        // or files from your local hard drive
+        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
 
-  <video id="video" autoplay playsinline></video>
-  <div id="info">Aguardando reconhecimento...</div>
-  <button id="zoomBtn">Zoom: 1X</button>
+        // Convenience function to setup a webcam
+        const flip = true; // whether to flip the webcam
+        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
+        await webcam.setup(); // request access to the webcam
+        await webcam.play();
+        window.requestAnimationFrame(loop);
 
-  <script>
-    const video = document.getElementById('video');
-    const info = document.getElementById('info');
-    const zoomBtn = document.getElementById('zoomBtn');
-
-    let currentZoom = 1;
-    const zoomLevels = [1, 2, 3];
-
-    const peopleData = {
-      pessoa_0: { name: "Mariana Ximenes", description: "Atriz brasileira, conhecida por seus papéis na TV." },
-      pessoa_1: { name: "Morgan Freeman", description: "Ator de cinema, filantropo, ganhador de Oscar." },
-      pessoa_2: { name: "Jean Tedesqui", description: "Profissional de tecnologia e inovação." }
-    };
-
-    async function setupCamera() {
-      const constraints = {
-        video: {
-          facingMode: "user",  // Câmera frontal
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          zoom: currentZoom
+        // append elements to the DOM
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+        for (let i = 0; i < maxPredictions; i++) { // and class labels
+            labelContainer.appendChild(document.createElement("div"));
         }
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      video.srcObject = stream;
-
-      const [track] = stream.getVideoTracks();
-      video.track = track;
     }
 
-    function toggleZoom() {
-      currentZoom = zoomLevels[(zoomLevels.indexOf(currentZoom) + 1) % zoomLevels.length];
-      zoomBtn.textContent = `Zoom: ${currentZoom}X`;
-
-      const capabilities = video.track.getCapabilities();
-      if (capabilities.zoom) {
-        video.track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-      }
+    async function loop() {
+        webcam.update(); // update the webcam frame
+        await predict();
+        window.requestAnimationFrame(loop);
     }
 
-    zoomBtn.addEventListener('click', toggleZoom);
-
-    async function loadModel() {
-      const model = await tf.loadGraphModel('./model/model.json'); // Substitua pelo caminho correto
-      return model;
-    }
-
-    async function detectFaces(model) {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-
-      setInterval(async () => {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const imgTensor = tf.browser.fromPixels(canvas).expandDims(0).toFloat().div(255);
-        const predictions = await model.executeAsync(imgTensor);
-
-        const boxes = predictions[1].arraySync()[0];
-        const classes = predictions[2].arraySync()[0];
-        const scores = predictions[0].arraySync()[0];
-
-        let recognized = false;
-
-        scores.forEach((score, i) => {
-          if (score > 0.7) {
-            const classId = classes[i];
-            const personKey = `pessoa_${classId}`;
-            if (peopleData[personKey]) {
-              const person = peopleData[personKey];
-              info.innerHTML = `<strong>${person.name}</strong><br>${person.description}`;
-              recognized = true;
-            }
-          }
-        });
-
-        if (!recognized) {
-          info.textContent = "Nenhuma pessoa reconhecida.";
+    // run the webcam image through the image model
+    async function predict() {
+        // predict can take in an image, video or canvas html element
+        const prediction = await model.predict(webcam.canvas);
+        for (let i = 0; i < maxPredictions; i++) {
+            const classPrediction =
+                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+            labelContainer.childNodes[i].innerHTML = classPrediction;
         }
-
-        tf.dispose([imgTensor, ...predictions]);
-      }, 1000);
     }
-
-    async function main() {
-      await setupCamera();
-      const model = await loadModel();
-      detectFaces(model);
-    }
-
-    main();
-  </script>
-</body>
-</html>
+</script>
