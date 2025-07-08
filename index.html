@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Reconhecimento Facial</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      background: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 12px;
+    }
+
+    #info {
+      margin-top: 10px;
+      font-size: 18px;
+    }
+
+    #zoomBtn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      border-radius: 10px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    #zoomBtn:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Reconhecimento Facial</h2>
+  <video id="video" autoplay playsinline></video>
+  <div id="info">Aguardando reconhecimento...</div>
+  <button id="zoomBtn">Zoom: 1X</button>
+
+  <script>
+    const video = document.getElementById('video');
+    const info = document.getElementById('info');
+    const zoomBtn = document.getElementById('zoomBtn');
+
+    let currentZoom = 1;
+    const zoomLevels = [1, 2, 3];
+
+    const peopleData = {
+      "Mariana": { name: "Mariana Ximenes", description: "Atriz brasileira, conhecida por diversos papéis na TV e no cinema." },
+      "Morgan": { name: "Morgan Freeman", description: "Ator de cinema, filantropo, ganhador de Oscar." },
+      "Jean": { name: "Jean", description: "Profissional de tecnologia, criador deste projeto." }
+    };
+
+    async function setupCamera() {
+      const constraints = {
+        video: {
+          facingMode: { exact: "environment" },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          zoom: currentZoom
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = stream;
+      const [track] = stream.getVideoTracks();
+      video.track = track;
+    }
+
+    function toggleZoom() {
+      currentZoom = zoomLevels[(zoomLevels.indexOf(currentZoom) + 1) % zoomLevels.length];
+      zoomBtn.textContent = `Zoom: ${currentZoom}X`;
+
+      const capabilities = video.track.getCapabilities();
+      if (capabilities.zoom) {
+        video.track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+      }
+    }
+
+    zoomBtn.addEventListener('click', toggleZoom);
+
+    async function loadModel() {
+      const model = await tf.loadGraphModel('https://tedesqui.github.io/arrest/model/model.json');
+      return model;
+    }
+
+    async function detectFaces(model) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      setInterval(async () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const imgTensor = tf.browser.fromPixels(canvas).expandDims(0).toFloat().div(255);
+
+        const predictions = await model.executeAsync(imgTensor);
+
+        const boxes = predictions[1].arraySync()[0];
+        const classes = predictions[2].arraySync()[0];
+        const scores = predictions[0].arraySync()[0];
+
+        let found = false;
+
+        scores.forEach((score, i) => {
+          if (score > 0.7) {
+            const classId = classes[i];
+            const personKey = `pessoa_${classId}`;
+            if (peopleData[personKey]) {
+              const person = peopleData[personKey];
+              info.innerHTML = `<strong>${person.name}</strong><br>${person.description}`;
+              found = true;
+            }
+          }
+        });
+
+        if (!found) info.textContent = "Nenhuma pessoa reconhecida.";
+
+        tf.dispose([imgTensor, ...predictions]);
+
+      }, 1000);
+    }
+
+    async function main() {
+      await setupCamera();
+      const model = await loadModel();
+      detectFaces(model);
+    }
+
+    main();
+  </script>
+</body>
+</html>
