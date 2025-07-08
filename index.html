@@ -2,37 +2,47 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Reconhecimento Facial</title>
+  <title>Reconhecimento Facial com Zoom</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js"></script>
   <style>
     body, html {
       margin: 0;
       padding: 0;
-      background: #000;
-      color: #fff;
       font-family: Arial, sans-serif;
-      text-align: center;
+      background-color: #000;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     video {
       width: 100%;
+      max-width: 600px;
       border-radius: 12px;
+      margin-top: 10px;
     }
 
     #info {
-      margin-top: 10px;
+      margin-top: 15px;
+      padding: 15px;
+      background: rgba(0,0,0,0.7);
+      border-radius: 10px;
+      width: 90%;
+      max-width: 600px;
       font-size: 18px;
+      text-align: center;
     }
 
     #zoomBtn {
-      margin-top: 15px;
-      padding: 10px 20px;
-      border-radius: 10px;
+      margin-top: 20px;
+      padding: 15px 25px;
+      border-radius: 12px;
       background: #007bff;
-      color: #fff;
       border: none;
+      color: #fff;
+      font-size: 20px;
       cursor: pointer;
-      font-size: 16px;
     }
 
     #zoomBtn:hover {
@@ -56,9 +66,9 @@
     const zoomLevels = [1, 2, 3];
 
     const peopleData = {
-      "Mariana": { name: "Mariana Ximenes", description: "Atriz brasileira, conhecida por diversos papéis na TV e no cinema." },
-      "Morgan": { name: "Morgan Freeman", description: "Ator de cinema, filantropo, ganhador de Oscar." },
-      "Jean": { name: "Jean", description: "Profissional de tecnologia, criador deste projeto." }
+      "pessoa_0": { name: "Mariana Ximenes", description: "Atriz brasileira, conhecida por seus papéis na TV." },
+      "pessoa_1": { name: "Elon Musk", description: "Empresário e CEO da Tesla e SpaceX." },
+      "pessoa_2": { name: "Jean Tedesqui", description: "Profissional de tecnologia e inovação." }
     };
 
     async function setupCamera() {
@@ -73,6 +83,7 @@
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       video.srcObject = stream;
+
       const [track] = stream.getVideoTracks();
       video.track = track;
     }
@@ -90,7 +101,7 @@
     zoomBtn.addEventListener('click', toggleZoom);
 
     async function loadModel() {
-      const model = await tf.loadGraphModel('https://tedesqui.github.io/project_test/model/model.json');
+      const model = await tf.loadGraphModel('model/model.json'); // Substitua pelo seu caminho correto
       return model;
     }
 
@@ -102,15 +113,15 @@
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imgTensor = tf.browser.fromPixels(canvas).expandDims(0).toFloat().div(255);
 
+        const imgTensor = tf.browser.fromPixels(canvas).expandDims(0).toFloat().div(255);
         const predictions = await model.executeAsync(imgTensor);
 
         const boxes = predictions[1].arraySync()[0];
         const classes = predictions[2].arraySync()[0];
         const scores = predictions[0].arraySync()[0];
 
-        let found = false;
+        let recognized = false;
 
         scores.forEach((score, i) => {
           if (score > 0.7) {
@@ -119,12 +130,14 @@
             if (peopleData[personKey]) {
               const person = peopleData[personKey];
               info.innerHTML = `<strong>${person.name}</strong><br>${person.description}`;
-              found = true;
+              recognized = true;
             }
           }
         });
 
-        if (!found) info.textContent = "Nenhuma pessoa reconhecida.";
+        if (!recognized) {
+          info.textContent = "Nenhuma pessoa reconhecida.";
+        }
 
         tf.dispose([imgTensor, ...predictions]);
 
