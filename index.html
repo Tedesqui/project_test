@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <!-- **CORREÇÃO CRÍTICA:** 'user-scalable=no' desativa o zoom do navegador -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
@@ -26,7 +27,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            /* Previne o comportamento de "puxar para atualizar" em navegadores móveis */
+            /* Previne o gesto de "puxar para atualizar" */
             overscroll-behavior-y: contain;
         }
 
@@ -39,7 +40,7 @@
             background: #1a1a1a;
             position: relative;
             border-radius: 18px;
-            /* Essencial para que os eventos de toque funcionem corretamente */
+            /* **CORREÇÃO CRÍTICA:** Garante que o navegador não aplique ações de toque padrão (como pinça ou arrastar) nesta área */
             touch-action: none;
         }
 
@@ -140,9 +141,8 @@
         const startButton = document.getElementById("startButton");
         const webcamContainer = document.getElementById("webcam-container");
 
-        // Variáveis para o controlo do zoom por pinça
         let zoomCapabilities = null;
-        let currentZoom = 1;
+        let startZoom = 1;
         let initialPinchDistance = 0;
 
         async function init() {
@@ -201,7 +201,7 @@
                 const capabilities = track.getCapabilities();
                 if (capabilities.zoom) {
                     zoomCapabilities = capabilities.zoom;
-                    currentZoom = zoomCapabilities.min || 1;
+                    startZoom = zoomCapabilities.min || 1;
                     webcamContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
                     webcamContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
                     webcamContainer.addEventListener('touchend', handleTouchEnd);
@@ -223,21 +223,22 @@
 
         function handleTouchStart(event) {
             if (event.touches.length === 2) {
+                // **CORREÇÃO CRÍTICA:** Previne a ação padrão do navegador (zoom da página)
                 event.preventDefault();
                 initialPinchDistance = getDistance(event.touches);
+                startZoom = webcam.stream.getVideoTracks()[0].getSettings().zoom || startZoom;
             }
         }
 
         function handleTouchMove(event) {
             if (event.touches.length === 2) {
+                // **CORREÇÃO CRÍTICA:** Previne a ação padrão do navegador durante o movimento
                 event.preventDefault();
                 const newPinchDistance = getDistance(event.touches);
                 const pinchRatio = newPinchDistance / initialPinchDistance;
 
-                // Calcula o novo zoom baseado no gesto
-                let newZoom = currentZoom * pinchRatio;
+                let newZoom = startZoom * pinchRatio;
 
-                // Limita o zoom entre 1x e 5x, e dentro das capacidades do aparelho
                 const maxAllowedZoom = Math.min(zoomCapabilities.max, 5);
                 newZoom = Math.max(zoomCapabilities.min, newZoom);
                 newZoom = Math.min(maxAllowedZoom, newZoom);
@@ -247,10 +248,7 @@
         }
 
         function handleTouchEnd(event) {
-            // Atualiza o nível de zoom atual quando o gesto termina
-            if (event.touches.length < 2) {
-                const track = webcam.stream.getVideoTracks()[0];
-                currentZoom = track.getSettings().zoom || currentZoom;
+            if (initialPinchDistance > 0 && event.touches.length < 2) {
                 initialPinchDistance = 0;
             }
         }
