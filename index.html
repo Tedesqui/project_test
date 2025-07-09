@@ -8,8 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         :root {
-            /* Área do vídeo reduzida em 30% (de 60vh para 42vh) */
-            --camera-height: 42vh;
+            /* Altura do vídeo aumentada em 30% (de 42vh para ~55vh) */
+            --camera-height: 55vh;
             --alert-height: 10vh;
             --footer-height: 15vh;
         }
@@ -81,7 +81,6 @@
             position: fixed;
             bottom: 0;
             display: flex;
-            /* Centraliza o botão único */
             justify-content: center;
             align-items: center;
             padding: 0 10px;
@@ -90,7 +89,7 @@
         }
 
         button {
-            width: 80%; /* Define uma largura para o botão único */
+            width: 80%;
             height: calc(var(--footer-height) - 5vh);
             font-size: clamp(18px, 4.5vw, 22px);
             border-radius: 12px;
