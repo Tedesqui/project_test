@@ -198,7 +198,7 @@
             for (const p of prediction) {
                 // **LÓGICA DE REDIRECIONAMENTO**
                 // Procura por "tedesqui" e verifica a probabilidade
-                if (p.className.toLowerCase().includes("tedesqui") && p.probability > 0.7) {
+                if (p.className.toLowerCase().includes("tedesqui") && p.probability > 0.9) {
                     // Para a câmara para evitar que continue a funcionar em segundo plano
                     if (webcam) {
                         webcam.stop();
