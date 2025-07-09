@@ -1,216 +1,297 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento Facial</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      background-color: #000;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <style>
+        :root {
+            --camera-height: 50vh;
+            --alert-height: 10vh;
+            --footer-height: 15vh;
+        }
 
-    #webcam-container {
-      width: 100vw;
-      height: 50vh; /* Melhor para caber em tela de celular */
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #000;
-      position: relative;
-    }
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
 
-    #webcam-container video, #webcam-container canvas {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border: 8px solid green;
-      border-radius: 12px;
-      box-sizing: border-box;
-    }
+        #webcam-container {
+            width: 95vw;
+            height: var(--camera-height);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #1a1a1a;
+            position: relative;
+            border-radius: 18px;
+        }
 
-    #alerta {
-      margin-top: 10px;
-      font-size: 24px;
-      font-weight: bold;
-      color: red;
-      text-align: center;
-      min-height: 30px;
-    }
+        #webcam-container canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border: 4px solid green;
+            border-radius: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.5s ease;
+        }
 
-    #label-container {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.7);
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      max-width: 90%;
-      z-index: 10;
-    }
+        #alerta {
+            height: var(--alert-height);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(18px, 4vw, 24px);
+            font-weight: bold;
+            color: red;
+            text-align: center;
+            text-shadow: 0 0 10px red;
+        }
 
-    .footer-buttons {
-      width: 100%;
-      position: fixed;
-      bottom: 10px;
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-    }
+        #label-container {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 14px;
+            max-width: 80%;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
 
-    button {
-      padding: 12px 20px;
-      font-size: 16px;
-      border-radius: 8px;
-      border: none;
-      background: #007bff;
-      color: #fff;
-      cursor: pointer;
-    }
+        .footer-buttons {
+            width: 100%;
+            height: var(--footer-height);
+            position: fixed;
+            bottom: 0;
+            display: flex;
+            justify-content: space-evenly;
+            align-items: center;
+            padding: 0 10px;
+            box-sizing: border-box;
+            background: #000;
+            gap: 10px;
+        }
 
-    button:hover {
-      background: #0056b3;
-    }
-  </style>
+        button {
+            flex-grow: 1;
+            height: calc(var(--footer-height) - 5vh);
+            font-size: clamp(16px, 4vw, 20px);
+            border-radius: 12px;
+            border: 2px solid #007bff;
+            background: #007bff20;
+            color: #fff;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        button:hover, button:active {
+            background: #007bff;
+        }
+        
+        button:active {
+             transform: scale(0.97);
+        }
+
+        button:disabled {
+            background: #55555550;
+            border-color: #555;
+            color: #999;
+            cursor: not-allowed;
+        }
+    </style>
 </head>
 <body>
 
-  <div id="webcam-container"></div>
-  <div id="alerta"></div>
-  <div id="label-container"></div>
+    <div id="webcam-container"></div>
+    <div id="alerta"></div>
+    <div id="label-container"></div>
 
-  <div class="footer-buttons">
-    <button id="startButton" onclick="init()">Iniciar/Atualizar Câmera</button>
-    <button id="zoomButton" onclick="toggleZoom()">Zoom: 1X</button>
-  </div>
+    <div class="footer-buttons">
+        <button id="startButton" onclick="init()">Ligar Câmera</button>
+        <button id="zoomButton" onclick="toggleZoom()" disabled>Zoom</button>
+    </div>
 
-  <script type="text/javascript">
-    const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
-    let model, webcam, maxPredictions;
-    let currentZoom = 1;
-    const zoomLevels = [1, 2, 3, 4, 5];
-    let alertaAtivo = false;
-    let alertaTimeout = null;
-    const labelContainer = document.getElementById("label-container");
+    <script type="text/javascript">
+        const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
+        let model, webcam, maxPredictions;
+        
+        // Variáveis para o controle de zoom adaptativo
+        let zoomLevels = [];
+        let currentZoomIndex = 0;
 
-    async function init() {
-      document.getElementById("startButton").innerText = "Atualizar Câmera";
+        let alertaAtivo = false;
+        let alertaTimeout = null;
+        const labelContainer = document.getElementById("label-container");
+        const zoomButton = document.getElementById("zoomButton");
+        const startButton = document.getElementById("startButton");
 
-      if (webcam) {
-        await webcam.stop();
-        const oldCanvas = document.querySelector('#webcam-container canvas');
-        if (oldCanvas) oldCanvas.remove();
-        clearAlert();
-      }
+        async function init() {
+            startButton.disabled = true;
+            startButton.innerText = "Carregando...";
 
-      if (!model) {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
-      }
+            if (webcam) {
+                await webcam.stop();
+                const oldCanvas = document.querySelector('#webcam-container canvas');
+                if (oldCanvas) oldCanvas.remove();
+                clearAlert();
+            }
 
-      const constraints = {
-        video: {
-          facingMode: { exact: "environment" }, // força câmera traseira
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+            if (!model) {
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
+                try {
+                    model = await tmImage.load(modelURL, metadataURL);
+                    maxPredictions = model.getTotalClasses();
+                } catch (e) {
+                    console.error("Erro ao carregar o modelo:", e);
+                    startButton.innerText = "Erro no Modelo";
+                    return;
+                }
+            }
+            
+            // O parâmetro 'flip' é 'false' para não espelhar a câmera traseira
+            const flip = false; 
+            webcam = new tmImage.Webcam(360, 640, flip);
+            
+            try {
+                // Modo correto de solicitar a câmera traseira
+                await webcam.setup({ facingMode: "environment" });
+                await webcam.play();
+            } catch (e) {
+                console.error("Erro ao iniciar a câmera:", e);
+                startButton.innerText = "Erro na Câmera";
+                startButton.disabled = false;
+                alert("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
+                return;
+            }
+            
+            window.requestAnimationFrame(loop);
+
+            const webcamContainer = document.getElementById("webcam-container");
+            webcamContainer.innerHTML = '';
+            webcamContainer.appendChild(webcam.canvas);
+
+            // Configura o zoom após a câmera iniciar
+            await setupZoom();
+            
+            startButton.innerText = "Reiniciar Câmera";
+            startButton.disabled = false;
         }
-      };
 
-      webcam = new tmImage.Webcam(640, 480, true, constraints);
-      await webcam.setup();
-      await webcam.play();
-      window.requestAnimationFrame(loop);
+        async function setupZoom() {
+            if (!webcam || !webcam.stream) return;
 
-      const webcamContainer = document.getElementById("webcam-container");
-      webcamContainer.appendChild(webcam.canvas);
-
-      webcam.canvas.style.border = '8px solid green';
-    }
-
-    function toggleZoom() {
-      if (!webcam || !webcam.stream) return;
-
-      currentZoom = zoomLevels[(zoomLevels.indexOf(currentZoom) + 1) % zoomLevels.length];
-      document.getElementById("zoomButton").innerText = `Zoom: ${currentZoom}X`;
-
-      const track = webcam.stream.getVideoTracks()[0];
-      const capabilities = track.getCapabilities();
-      if (capabilities.zoom) {
-        const zoomValue = Math.min(Math.max(currentZoom, capabilities.zoom.min), capabilities.zoom.max);
-        track.applyConstraints({ advanced: [{ zoom: zoomValue }] });
-      } else {
-        console.log("Zoom não suportado neste dispositivo.");
-      }
-    }
-
-    async function loop() {
-      if (webcam) {
-        webcam.update();
-        await predict();
-        window.requestAnimationFrame(loop);
-      }
-    }
-
-    async function predict() {
-      if (!model || !webcam) return;
-
-      const prediction = await model.predict(webcam.canvas);
-      const canvas = document.querySelector('#webcam-container canvas');
-      const alertaDiv = document.getElementById("alerta");
-
-      labelContainer.innerHTML = "";
-      let tedesquiDetectado = false;
-
-      prediction.forEach(p => {
-        const probText = `${p.className}: ${(p.probability * 100).toFixed(1)}%`;
-        const div = document.createElement('div');
-        div.innerText = probText;
-        labelContainer.appendChild(div);
-
-        if (p.className.toLowerCase().includes("tedesqui") && p.probability > 0.7) {
-          tedesquiDetectado = true;
+            const track = webcam.stream.getVideoTracks()[0];
+            try {
+                const capabilities = track.getCapabilities();
+                if (capabilities.zoom) {
+                    const { min, max } = capabilities.zoom;
+                    // Cria 5 níveis de zoom do mínimo ao máximo suportado
+                    zoomLevels = Array.from({length: 5}, (_, i) => min + i * (max - min) / 4);
+                    currentZoomIndex = 0;
+                    const currentZoom = zoomLevels[currentZoomIndex];
+                    
+                    zoomButton.disabled = false;
+                    zoomButton.innerText = `Zoom: ${currentZoom.toFixed(1)}X`;
+                } else {
+                    zoomButton.innerText = "Zoom N/A";
+                    zoomButton.disabled = true;
+                }
+            } catch (e) {
+                console.error("Não foi possível obter as capacidades de zoom:", e);
+                zoomButton.innerText = "Zoom Erro";
+                zoomButton.disabled = true;
+            }
         }
-      });
 
-      if (tedesquiDetectado && !alertaAtivo) {
-        alertaDiv.innerHTML = "🚨 ALERTA: TEDESQUI DETECTADO! 🚨";
-        canvas.style.border = '8px solid red';
-        alertaAtivo = true;
+        function toggleZoom() {
+            if (zoomLevels.length <= 1) {
+                console.warn("Zoom não está disponível ou não é variável.");
+                return;
+            }
+            
+            // Avança para o próximo nível de zoom
+            currentZoomIndex = (currentZoomIndex + 1) % zoomLevels.length;
+            const newZoomValue = zoomLevels[currentZoomIndex];
 
-        clearTimeout(alertaTimeout);
-        alertaTimeout = setTimeout(() => {
-          clearAlert();
-        }, 6000);
-      }
-    }
+            const track = webcam.stream.getVideoTracks()[0];
+            track.applyConstraints({
+                advanced: [{ zoom: newZoomValue }]
+            }).catch(e => console.error("Falha ao aplicar zoom:", e));
 
-    function clearAlert() {
-      const alertaDiv = document.getElementById("alerta");
-      const canvas = document.querySelector('#webcam-container canvas');
-      alertaDiv.innerHTML = "";
-      if (canvas) canvas.style.border = '8px solid green';
-      alertaAtivo = false;
-      clearTimeout(alertaTimeout);
-    }
+            zoomButton.innerText = `Zoom: ${newZoomValue.toFixed(1)}X`;
+        }
 
-    window.addEventListener('beforeunload', () => {
-      clearAlert();
-      if (webcam) webcam.stop();
-    });
-  </script>
+        async function loop() {
+            if (webcam && webcam.canvas) {
+                webcam.update();
+                await predict();
+                window.requestAnimationFrame(loop);
+            }
+        }
+
+        async function predict() {
+            if (!model || !webcam || !webcam.canvas) return;
+
+            const prediction = await model.predict(webcam.canvas);
+            const canvas = document.querySelector('#webcam-container canvas');
+            const alertaDiv = document.getElementById("alerta");
+
+            labelContainer.innerHTML = "";
+            let tedesquiDetectado = false;
+
+            for (const p of prediction) {
+                if (p.className.toLowerCase().includes("tedesqui") && p.probability > 0.7) {
+                    tedesquiDetectado = true;
+                }
+                const probText = `${p.className}: ${(p.probability * 100).toFixed(1)}%`;
+                const div = document.createElement('div');
+                div.innerText = probText;
+                labelContainer.appendChild(div);
+            }
+
+            if (tedesquiDetectado) {
+                if (!alertaAtivo) {
+                    alertaDiv.innerHTML = "🚨 ALERTA NÍVEL A! 🚨";
+                    if (canvas) canvas.style.borderColor = 'red';
+                    alertaAtivo = true;
+
+                    clearTimeout(alertaTimeout);
+                    alertaTimeout = setTimeout(clearAlert, 6000);
+                }
+            }
+        }
+
+        function clearAlert() {
+            const alertaDiv = document.getElementById("alerta");
+            const canvas = document.querySelector('#webcam-container canvas');
+            alertaDiv.innerHTML = "";
+            if (canvas) canvas.style.borderColor = 'green';
+            alertaAtivo = false;
+            clearTimeout(alertaTimeout);
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (webcam) webcam.stop();
+        });
+    </script>
 
 </body>
 </html>
