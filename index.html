@@ -2,15 +2,17 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <!-- Viewport para garantir a responsividade em dispositivos móveis -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento</title>
+    <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento Facial</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         :root {
+            /* Unidades de viewport para um layout consistente */
             --camera-height: 60vh;
             --alert-height: 10vh;
-            --footer-height: 10vh;
+            --footer-height: 15vh;
         }
 
         body, html {
@@ -26,7 +28,6 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            overscroll-behavior-y: contain;
         }
 
         #webcam-container {
@@ -55,10 +56,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(24px, 5vw, 36px);
+            font-size: clamp(24px, 5vw, 36px); /* Fonte responsiva */
             font-weight: bold;
-            color: #fff; /* Cor alterada para uma mensagem de status */
+            color: red;
             text-align: center;
+            text-shadow: 0 0 10px red;
         }
 
         #label-container {
@@ -90,7 +92,7 @@
         button {
             width: 80%;
             height: calc(var(--footer-height) - 5vh);
-            font-size: clamp(18px, 4.5vw, 22px);
+            font-size: clamp(18px, 4.5vw, 22px); /* Tamanho de fonte responsivo */
             border-radius: 12px;
             border: 2px solid #007bff;
             background: #007bff20;
@@ -130,20 +132,21 @@
         const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
         let model, webcam, maxPredictions;
 
+        let alertaAtivo = false;
+        let alertaTimeout = null;
         const labelContainer = document.getElementById("label-container");
         const startButton = document.getElementById("startButton");
         const webcamContainer = document.getElementById("webcam-container");
-        const alertaDiv = document.getElementById("alerta");
 
         async function init() {
             startButton.disabled = true;
             startButton.innerText = "A carregar...";
-            alertaDiv.innerText = "";
 
             if (webcam) {
                 await webcam.stop();
                 const oldCanvas = document.querySelector('#webcam-container canvas');
                 if (oldCanvas) oldCanvas.remove();
+                clearAlert();
             }
 
             if (!model) {
@@ -194,24 +197,31 @@
             if (!model || !webcam || !webcam.canvas) return;
 
             const prediction = await model.predict(webcam.canvas);
+            const canvas = document.querySelector('#webcam-container canvas');
+            const alertaDiv = document.getElementById("alerta");
+
+            let tedesquiDetectado = false;
 
             for (const p of prediction) {
-                // **LÓGICA DE REDIRECIONAMENTO**
-                // Procura por "tedesqui" e verifica a probabilidade
-                if (p.className.toLowerCase().includes("tedesqui") && p.probability > 0.9) {
-                    // Para a câmara para evitar que continue a funcionar em segundo plano
-                    if (webcam) {
-                        webcam.stop();
-                    }
-                    // Mostra uma mensagem antes de redirecionar
-                    alertaDiv.innerText = "Alvo localizado. A redirecionar...";
-                    // Redireciona para o site especificado
-                    window.location.href = 'https://www.youtube.com/results?search_query=Teachable+Machine+reconhecimento+facial';
-                    return; // Sai da função para evitar mais processamento
+                // **CORREÇÃO:** A probabilidade foi ajustada para 97%
+                if (p.className.toLowerCase().includes("tedesqui") && p.probability > 0.97) {
+                    tedesquiDetectado = true;
                 }
             }
 
-            // A lógica abaixo só será executada se o alvo não for encontrado
+            // A lógica de alerta visual foi separada para maior clareza
+            if (tedesquiDetectado) {
+                if (!alertaAtivo) {
+                    alertaDiv.innerHTML = "🚨 ALERTA NÍVEL A! 🚨";
+                    if (canvas) canvas.style.borderColor = 'red';
+                    alertaAtivo = true;
+
+                    clearTimeout(alertaTimeout);
+                    alertaTimeout = setTimeout(clearAlert, 6000);
+                }
+            }
+
+            // Mostra sempre as probabilidades
             labelContainer.innerHTML = "";
             prediction.forEach(p => {
                 const probText = `${p.className}: ${(p.probability * 100).toFixed(1)}%`;
@@ -219,6 +229,15 @@
                 div.innerText = probText;
                 labelContainer.appendChild(div);
             });
+        }
+
+        function clearAlert() {
+            const alertaDiv = document.getElementById("alerta");
+            const canvas = document.querySelector('#webcam-container canvas');
+            alertaDiv.innerHTML = "";
+            if (canvas) canvas.style.borderColor = 'green';
+            alertaAtivo = false;
+            clearTimeout(alertaTimeout);
         }
 
         window.addEventListener('beforeunload', () => {
