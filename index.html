@@ -121,11 +121,12 @@
         maxPredictions = model.getTotalClasses();
       }
 
-      const constraints = {
-        video: {
-          facingMode: useFrontCamera ? 'user' : { exact: "environment" },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
+ async function startCamera() {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { exact: "environment" },
+        width: { ideal: 640 },
+        height: { ideal: 480 }
         }
       };
 
