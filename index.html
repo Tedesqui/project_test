@@ -88,7 +88,7 @@
   </div>
 
   <script type="text/javascript">
-    const URL = "https://teachablemachine.withgoogle.com/models/BZaioL5ST/";
+    const URL = "https://teachablemachine.withgoogle.com/models/HbdeaQDRp/";
     let model, webcam, maxPredictions;
     let currentZoom = 1;
     const zoomLevels = [1, 2, 3];
@@ -153,8 +153,8 @@
             const classPrediction = className + ": " + prob.toFixed(2);
             labelContainer.childNodes[i].innerHTML = classPrediction;
 
-            // Se for Jean e probabilidade maior que 0.5
-            if (className.toLowerCase().includes("jean") && prob > 0.5) {
+            // Se for Jean e probabilidade maior que 0.7
+            if (className.toLowerCase().includes("jean") && prob > 0.7) {
                 alertaAtivado = true;
             }
         }
