@@ -8,7 +8,8 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         :root {
-            --camera-height: 80vh;
+            /* Altura da câmera reduzida para metade (40vh) */
+            --camera-height: 40vh;
             --alert-height: 7vh;
             --footer-height: 13vh;
         }
@@ -25,24 +26,25 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
+            /* Centraliza o conteúdo verticalmente */
+            justify-content: center;
         }
 
         #webcam-container {
-            width: 100vw;
+            width: 90vw; /* Largura um pouco menor para melhor visualização */
             height: var(--camera-height);
             display: flex;
             justify-content: center;
             align-items: center;
             background: #1a1a1a;
             position: relative;
+            border-radius: 18px; /* Bordas arredondadas no container */
         }
 
         #webcam-container canvas {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            /* Borda reduzida em 50% */
             border: 4px solid green;
             border-radius: 16px;
             box-sizing: border-box;
@@ -54,7 +56,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            /* Tamanho da fonte do alerta reduzido em 50% */
             font-size: clamp(11px, 2.5vw, 18px);
             font-weight: bold;
             color: red;
@@ -130,10 +131,9 @@
     </div>
 
     <script type="text/javascript">
-        const URL = "https://teachablemachine.withgoogle.com/models/O7-sv4XJn/";
+        const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
         let model, webcam, maxPredictions;
         
-        // Variáveis de controle de zoom
         let zoomLevels = [];
         let currentZoomIndex = 0;
 
@@ -167,9 +167,7 @@
                 }
             }
             
-            // A imagem não é invertida (flip = false)
             const flip = false; 
-            // O modo de câmera é sempre 'environment' (traseira)
             const facingMode = "environment";
             
             webcam = new tmImage.Webcam(360, 640, flip);
@@ -193,7 +191,6 @@
 
             await setupZoom();
             
-            // O botão agora serve para reiniciar a câmera
             startButton.innerText = "Reiniciar Câmera";
             startButton.disabled = false;
         }
@@ -206,7 +203,18 @@
                 const capabilities = track.getCapabilities();
                 if (capabilities.zoom) {
                     const { min, max } = capabilities.zoom;
-                    zoomLevels = Array.from({length: 5}, (_, i) => min + i * (max - min) / 4);
+                    const desiredMaxZoom = 5;
+                    // Usa o menor valor entre o máximo da câmera e o nosso máximo desejado de 5x
+                    const effectiveMaxZoom = Math.min(max, desiredMaxZoom);
+
+                    // Cria 5 níveis de zoom entre o mínimo e o máximo efetivo
+                    if (effectiveMaxZoom > min) {
+                        zoomLevels = Array.from({length: 5}, (_, i) => min + i * (effectiveMaxZoom - min) / 4);
+                    } else {
+                        // Caso o zoom não seja variável
+                        zoomLevels = [min];
+                    }
+                    
                     currentZoomIndex = 0;
                     const currentZoom = zoomLevels[currentZoomIndex];
                     
@@ -224,8 +232,8 @@
         }
 
         function toggleZoom() {
-            if (zoomLevels.length === 0) {
-                console.warn("Zoom não está disponível.");
+            if (zoomLevels.length <= 1) {
+                console.warn("Zoom não está disponível ou não é variável.");
                 return;
             }
             
