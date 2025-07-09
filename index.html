@@ -41,7 +41,7 @@
 
     #alerta {
       margin-top: 10px;
-      font-size: 52px;  /* AUMENTADO 200% */
+      font-size: 52px; /* 200% maior */
       font-weight: bold;
       color: red;
       text-align: center;
@@ -119,7 +119,7 @@
 
       const constraints = {
         video: {
-          facingMode: { exact: "environment" },
+          facingMode: { ideal: "environment" }, // CORREÇÃO: ideal em vez de exact
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
@@ -152,7 +152,7 @@
       const alertaDiv = document.getElementById("alerta");
 
       labelContainer.innerHTML = "";
-      let tedesquiEncontrado = false;
+      let tedesquiDetectado = false;
 
       predictions.forEach(p => {
         const probText = `${p.className}: ${(p.probability * 100).toFixed(1)}%`;
@@ -161,11 +161,11 @@
         labelContainer.appendChild(div);
 
         if (p.className.toLowerCase().includes("tedesqui") && p.probability > 0.7) {
-          tedesquiEncontrado = true;
+          tedesquiDetectado = true;
         }
       });
 
-      if (tedesquiEncontrado && !alertaAtivo) {
+      if (tedesquiDetectado && !alertaAtivo) {
         alertaDiv.innerHTML = "🚨 ALERTA: TEDESQUI DETECTADO! 🚨";
         canvas.style.border = '8px solid red';
         alertaAtivo = true;
