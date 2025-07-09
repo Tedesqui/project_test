@@ -8,10 +8,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         :root {
-            /* Altura do vídeo aumentada em 30% (de 42vh para ~55vh) */
             --camera-height: 55vh;
             --alert-height: 10vh;
-            --footer-height: 10vh;
+            --footer-height: 15vh;
         }
 
         body, html {
@@ -38,6 +37,8 @@
             background: #1a1a1a;
             position: relative;
             border-radius: 18px;
+            /* O cursor de ponteiro indica que a área é clicável */
+            cursor: pointer;
         }
 
         #webcam-container canvas {
@@ -135,6 +136,12 @@
         let alertaTimeout = null;
         const labelContainer = document.getElementById("label-container");
         const startButton = document.getElementById("startButton");
+        const webcamContainer = document.getElementById("webcam-container");
+
+        // Variáveis para controle do zoom por toque duplo
+        let isZoomedIn = false;
+        let lastTap = 0;
+        let zoomCapabilities = null;
 
         async function init() {
             startButton.disabled = true;
@@ -176,12 +183,69 @@
             
             window.requestAnimationFrame(loop);
 
-            const webcamContainer = document.getElementById("webcam-container");
             webcamContainer.innerHTML = '';
             webcamContainer.appendChild(webcam.canvas);
             
+            // Configura o zoom e o listener de toque duplo
+            await setupZoomAndTapListener();
+            
             startButton.innerText = "Reiniciar Câmera";
             startButton.disabled = false;
+        }
+
+        // Função para configurar o zoom e adicionar o listener de toque
+        async function setupZoomAndTapListener() {
+            if (!webcam || !webcam.stream) return;
+            const track = webcam.stream.getVideoTracks()[0];
+            try {
+                const capabilities = track.getCapabilities();
+                if (capabilities.zoom) {
+                    zoomCapabilities = capabilities.zoom;
+                    // Adiciona o listener de evento de clique/toque no container do vídeo
+                    webcamContainer.addEventListener('click', handleDoubleTap);
+                } else {
+                    console.log("Zoom não é suportado neste dispositivo.");
+                }
+            } catch (e) {
+                console.error("Não foi possível obter as capacidades de zoom:", e);
+            }
+        }
+
+        // Função que detecta o toque duplo
+        function handleDoubleTap() {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            // Se o tempo entre toques for menor que 500ms, é um toque duplo
+            if (tapLength < 500 && tapLength > 0) {
+                toggleZoom();
+            }
+            lastTap = currentTime;
+        }
+
+        // Função que alterna o zoom
+        function toggleZoom() {
+            if (!webcam || !webcam.stream || !zoomCapabilities) {
+                console.log("Zoom não está pronto ou não é suportado.");
+                return;
+            }
+
+            const track = webcam.stream.getVideoTracks()[0];
+            const { min, max } = zoomCapabilities;
+            let newZoomValue;
+
+            if (isZoomedIn) {
+                // Se já estiver com zoom, volta ao valor mínimo
+                newZoomValue = min;
+                isZoomedIn = false;
+            } else {
+                // Se não tiver zoom, aplica zoom de 3x, respeitando o máximo do aparelho
+                newZoomValue = Math.min(max, 3);
+                isZoomedIn = true;
+            }
+
+            track.applyConstraints({
+                advanced: [{ zoom: newZoomValue }]
+            }).catch(e => console.error("Falha ao aplicar zoom:", e));
         }
 
         async function loop() {
