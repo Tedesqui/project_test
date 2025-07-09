@@ -1,142 +1,196 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-    <style>
-        /* (Manter os estilos anteriores) */
-    </style>
+  <meta charset="UTF-8">
+  <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento Facial Smartphone</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #camera-container {
+      width: 100vw;
+      height: 60vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+      position: relative;
+    }
+
+    #camera-container video, #camera-container canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border: 8px solid green;
+      border-radius: 12px;
+      box-sizing: border-box;
+    }
+
+    #alerta {
+      margin-top: 10px;
+      font-size: 52px;  /* AUMENTADO 200% */
+      font-weight: bold;
+      color: red;
+      text-align: center;
+      min-height: 60px;
+    }
+
+    #label-container {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      max-width: 90%;
+      z-index: 10;
+    }
+
+    .footer-buttons {
+      width: 100%;
+      position: fixed;
+      bottom: 20px;
+      display: flex;
+      justify-content: center;
+    }
+
+    #startButton {
+      padding: 36px 72px;
+      font-size: 48px;
+      border-radius: 12px;
+      border: none;
+      background: #007bff;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #startButton:hover {
+      background: #0056b3;
+    }
+  </style>
 </head>
 <body>
 
-    <div id="webcam-container">
-        <div class="zoom-indicator" id="zoomIndicator">1.0x</div>
-        <div id="camera-error" style="display:none; color:white; text-align:center; padding:20px;">
-            Não foi possível acessar a câmera traseira.<br>
-            <button onclick="retryCameraAccess()" style="margin-top:10px;">Tentar Novamente</button>
-        </div>
-    </div>
-    <!-- (Manter o resto do HTML anterior) -->
+  <div id="camera-container"></div>
+  <div id="alerta"></div>
+  <div id="label-container"></div>
 
-    <script type="text/javascript">
-        // (Manter as variáveis anteriores)
+  <div class="footer-buttons">
+    <button id="startButton" onclick="startCamera()">Iniciar Câmera</button>
+  </div>
 
-        async function init() {
-            startButton.disabled = true;
-            startButton.innerText = "Carregando...";
+  <script type="text/javascript">
+    const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
+    let model, cameraStream, maxPredictions;
+    let alertaAtivo = false;
+    let alertaTimeout = null;
+    const labelContainer = document.getElementById("label-container");
 
-            // Esconde mensagem de erro se estiver visível
-            document.getElementById('camera-error').style.display = 'none';
+    async function startCamera() {
+      document.getElementById("startButton").innerText = "Atualizar Câmera";
 
-            if (webcam) {
-                await webcam.stop();
-                const oldCanvas = document.querySelector('#webcam-container canvas');
-                if (oldCanvas) oldCanvas.remove();
-                clearAlert();
-            }
+      if (cameraStream) {
+        await cameraStream.stop();
+        const oldCanvas = document.querySelector('#camera-container canvas');
+        if (oldCanvas) oldCanvas.remove();
+        clearAlert();
+      }
 
-            if (!model) {
-                const modelURL = URL + "model.json";
-                const metadataURL = URL + "metadata.json";
-                try {
-                    model = await tmImage.load(modelURL, metadataURL);
-                    maxPredictions = model.getTotalClasses();
-                } catch (e) {
-                    console.error("Erro ao carregar o modelo:", e);
-                    startButton.innerText = "Erro no Modelo";
-                    showCameraError("Erro ao carregar o modelo de IA");
-                    return;
-                }
-            }
-            
-            try {
-                // Tentativa mais robusta de acessar a câmera traseira
-                const constraints = {
-                    video: {
-                        facingMode: { exact: "environment" },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                };
+      if (!model) {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+      }
 
-                // Primeiro tenta com as constraints ideais
-                await setupWebcam(constraints);
-                
-            } catch (firstError) {
-                console.log("Primeira tentativa falhou, tentando fallback:", firstError);
-                
-                try {
-                    // Fallback 1: Tentativa sem especificar resolução
-                    const fallbackConstraints1 = {
-                        video: {
-                            facingMode: { exact: "environment" }
-                        }
-                    };
-                    await setupWebcam(fallbackConstraints1);
-                    
-                } catch (secondError) {
-                    console.log("Fallback 1 falhou, tentando fallback 2:", secondError);
-                    
-                    try {
-                        // Fallback 2: Tentativa com qualquer câmera
-                        const fallbackConstraints2 = {
-                            video: true
-                        };
-                        await setupWebcam(fallbackConstraints2);
-                        
-                    } catch (finalError) {
-                        console.error("Todas as tentativas falharam:", finalError);
-                        startButton.innerText = "Ligar Câmera";
-                        startButton.disabled = false;
-                        showCameraError("Não foi possível acessar nenhuma câmera. Verifique as permissões.");
-                        return;
-                    }
-                }
-            }
-            
-            startButton.innerText = "Reiniciar Câmera";
-            startButton.disabled = false;
+      const constraints = {
+        video: {
+          facingMode: { exact: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
         }
+      };
 
-        async function setupWebcam(constraints) {
-            const flip = false;
-            const isPortrait = window.innerHeight > window.innerWidth;
-            const width = isPortrait ? window.innerWidth : Math.floor(window.innerHeight * 0.75);
-            const height = isPortrait ? Math.floor(window.innerHeight * 0.7) : window.innerHeight;
-            
-            webcam = new tmImage.Webcam(width, height, flip);
-            
-            // Configuração especial para iOS
-            if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                constraints.video.facingMode = "environment"; // iOS pode não suportar 'exact'
-            }
-            
-            await webcam.setup(constraints);
-            await webcam.play();
-            
-            videoTrack = webcam.stream.getVideoTracks()[0];
-            await setupZoomControls();
-            
-            const webcamContainer = document.getElementById("webcam-container");
-            webcamContainer.innerHTML = '';
-            webcamContainer.appendChild(webcam.canvas);
-            zoomIndicator.style.display = 'block';
+      cameraStream = new tmImage.Webcam(640, 480, true, constraints);
+      await cameraStream.setup();
+      await cameraStream.play();
+      window.requestAnimationFrame(detectLoop);
+
+      const cameraContainer = document.getElementById("camera-container");
+      cameraContainer.appendChild(cameraStream.canvas);
+
+      cameraStream.canvas.style.border = '8px solid green';
+    }
+
+    async function detectLoop() {
+      if (cameraStream) {
+        cameraStream.update();
+        await detectFaces();
+        window.requestAnimationFrame(detectLoop);
+      }
+    }
+
+    async function detectFaces() {
+      if (!model || !cameraStream) return;
+
+      const predictions = await model.predict(cameraStream.canvas);
+      const canvas = document.querySelector('#camera-container canvas');
+      const alertaDiv = document.getElementById("alerta");
+
+      labelContainer.innerHTML = "";
+      let tedesquiEncontrado = false;
+
+      predictions.forEach(p => {
+        const probText = `${p.className}: ${(p.probability * 100).toFixed(1)}%`;
+        const div = document.createElement('div');
+        div.innerText = probText;
+        labelContainer.appendChild(div);
+
+        if (p.className.toLowerCase().includes("tedesqui") && p.probability > 0.7) {
+          tedesquiEncontrado = true;
         }
+      });
 
-        function showCameraError(message) {
-            const errorDiv = document.getElementById('camera-error');
-            errorDiv.innerHTML = message + '<br><button onclick="retryCameraAccess()" style="margin-top:10px;">Tentar Novamente</button>';
-            errorDiv.style.display = 'block';
-        }
+      if (tedesquiEncontrado && !alertaAtivo) {
+        alertaDiv.innerHTML = "🚨 ALERTA: TEDESQUI DETECTADO! 🚨";
+        canvas.style.border = '8px solid red';
+        alertaAtivo = true;
 
-        function retryCameraAccess() {
-            init();
-        }
+        clearTimeout(alertaTimeout);
+        alertaTimeout = setTimeout(() => {
+          clearAlert();
+        }, 6000);
+      }
+    }
 
-        // (Manter as outras funções anteriores)
-    </script>
+    function clearAlert() {
+      const alertaDiv = document.getElementById("alerta");
+      const canvas = document.querySelector('#camera-container canvas');
+      alertaDiv.innerHTML = "";
+      if (canvas) canvas.style.border = '8px solid green';
+      alertaAtivo = false;
+      clearTimeout(alertaTimeout);
+    }
+
+    window.addEventListener('beforeunload', () => {
+      clearAlert();
+      if (cameraStream) cameraStream.stop();
+    });
+  </script>
+
 </body>
 </html>
