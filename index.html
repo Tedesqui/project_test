@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         :root {
-            --camera-height: 55vh;
+            --camera-height: 60vh;
             --alert-height: 10vh;
             --footer-height: 15vh;
         }
@@ -26,6 +26,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            /* Previne o comportamento de "puxar para atualizar" em navegadores móveis */
+            overscroll-behavior-y: contain;
         }
 
         #webcam-container {
@@ -37,7 +39,8 @@
             background: #1a1a1a;
             position: relative;
             border-radius: 18px;
-            cursor: pointer;
+            /* Essencial para que os eventos de toque funcionem corretamente */
+            touch-action: none;
         }
 
         #webcam-container canvas {
@@ -137,10 +140,10 @@
         const startButton = document.getElementById("startButton");
         const webcamContainer = document.getElementById("webcam-container");
 
-        // Variáveis para controlo do zoom por toque duplo
-        let isZoomedIn = false;
-        let lastTap = 0;
+        // Variáveis para o controlo do zoom por pinça
         let zoomCapabilities = null;
+        let currentZoom = 1;
+        let initialPinchDistance = 0;
 
         async function init() {
             startButton.disabled = true;
@@ -185,21 +188,23 @@
             webcamContainer.innerHTML = '';
             webcamContainer.appendChild(webcam.canvas);
             
-            await setupZoomAndTapListener();
+            await setupPinchZoomListener();
             
             startButton.innerText = "Reiniciar Câmara";
             startButton.disabled = false;
         }
 
-        async function setupZoomAndTapListener() {
+        async function setupPinchZoomListener() {
             if (!webcam || !webcam.stream) return;
             const track = webcam.stream.getVideoTracks()[0];
             try {
                 const capabilities = track.getCapabilities();
                 if (capabilities.zoom) {
                     zoomCapabilities = capabilities.zoom;
-                    // **CORREÇÃO:** Usa 'touchstart' que é mais fiável em dispositivos móveis
-                    webcamContainer.addEventListener('touchstart', handleDoubleTap);
+                    currentZoom = zoomCapabilities.min || 1;
+                    webcamContainer.addEventListener('touchstart', handleTouchStart, { passive: false });
+                    webcamContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+                    webcamContainer.addEventListener('touchend', handleTouchEnd);
                 } else {
                     console.log("O zoom não é suportado neste dispositivo.");
                 }
@@ -208,41 +213,53 @@
             }
         }
 
-        function handleDoubleTap(event) {
-            // **CORREÇÃO:** Previne o comportamento padrão do navegador (como dar zoom na página inteira)
-            event.preventDefault();
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            // Se o tempo entre toques for menor que 500ms, é um toque duplo
-            if (tapLength < 500 && tapLength > 0) {
-                toggleZoom();
-                // Zera o último toque para evitar um terceiro toque rápido
-                lastTap = 0;
-            } else {
-                lastTap = currentTime;
+        function getDistance(touches) {
+            const [touch1, touch2] = touches;
+            return Math.sqrt(
+                Math.pow(touch2.pageX - touch1.pageX, 2) +
+                Math.pow(touch2.pageY - touch1.pageY, 2)
+            );
+        }
+
+        function handleTouchStart(event) {
+            if (event.touches.length === 2) {
+                event.preventDefault();
+                initialPinchDistance = getDistance(event.touches);
             }
         }
 
-        function toggleZoom() {
-            if (!webcam || !webcam.stream || !zoomCapabilities) {
-                console.log("O zoom não está pronto ou não é suportado.");
-                return;
-            }
+        function handleTouchMove(event) {
+            if (event.touches.length === 2) {
+                event.preventDefault();
+                const newPinchDistance = getDistance(event.touches);
+                const pinchRatio = newPinchDistance / initialPinchDistance;
 
+                // Calcula o novo zoom baseado no gesto
+                let newZoom = currentZoom * pinchRatio;
+
+                // Limita o zoom entre 1x e 5x, e dentro das capacidades do aparelho
+                const maxAllowedZoom = Math.min(zoomCapabilities.max, 5);
+                newZoom = Math.max(zoomCapabilities.min, newZoom);
+                newZoom = Math.min(maxAllowedZoom, newZoom);
+
+                setZoom(newZoom);
+            }
+        }
+
+        function handleTouchEnd(event) {
+            // Atualiza o nível de zoom atual quando o gesto termina
+            if (event.touches.length < 2) {
+                const track = webcam.stream.getVideoTracks()[0];
+                currentZoom = track.getSettings().zoom || currentZoom;
+                initialPinchDistance = 0;
+            }
+        }
+
+        function setZoom(zoomValue) {
+            if (!webcam || !webcam.stream || !zoomCapabilities) return;
             const track = webcam.stream.getVideoTracks()[0];
-            const { min, max } = zoomCapabilities;
-            let newZoomValue;
-
-            if (isZoomedIn) {
-                newZoomValue = min;
-                isZoomedIn = false;
-            } else {
-                newZoomValue = Math.min(max, 3); // Aplica zoom de 3x ou o máximo permitido
-                isZoomedIn = true;
-            }
-
             track.applyConstraints({
-                advanced: [{ zoom: newZoomValue }]
+                advanced: [{ zoom: zoomValue }]
             }).catch(e => console.error("Falha ao aplicar o zoom:", e));
         }
 
