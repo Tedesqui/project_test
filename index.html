@@ -2,16 +2,16 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <!-- Tag essencial para responsividade em dispositivos móveis -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>𝐀𝐑𝐑𝐄�𝐓</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>𝐀𝐑𝐑𝐄𝐒𝐓</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         :root {
-            --button-height: 70px;
-            --footer-gap: 15px;
-            --footer-height: calc(var(--button-height) + (var(--footer-gap) * 2));
+            /* Definindo proporções da tela com unidades de viewport height (vh) */
+            --camera-height: 80vh;
+            --alert-height: 7vh;
+            --footer-height: 13vh;
         }
 
         body, html {
@@ -26,13 +26,12 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: flex-start; /* Alinha conteúdo no topo */
+            justify-content: flex-start;
         }
 
         #webcam-container {
             width: 100vw;
-            /* Ocupa o espaço restante, descontando o rodapé e o alerta */
-            height: calc(100vh - var(--footer-height) - 60px);
+            height: var(--camera-height); /* Altura aumentada */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -40,7 +39,6 @@
             position: relative;
         }
 
-        /* O canvas da webcam preenche o container */
         #webcam-container canvas {
             width: 100%;
             height: 100%;
@@ -52,11 +50,11 @@
         }
 
         #alerta {
-            height: 60px; /* Altura fixa para o alerta */
+            height: var(--alert-height);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(24px, 6vw, 40px); /* Fonte responsiva */
+            font-size: clamp(22px, 5vw, 36px);
             font-weight: bold;
             color: red;
             text-align: center;
@@ -82,21 +80,21 @@
             position: fixed;
             bottom: 0;
             display: flex;
-            justify-content: space-evenly; /* Distribui os botões */
+            justify-content: space-evenly;
             align-items: center;
-            padding: 0 var(--footer-gap);
+            padding: 0 10px;
             box-sizing: border-box;
             background: #000;
-            gap: var(--footer-gap);
+            gap: 10px;
         }
 
         button {
-            flex-grow: 1; /* Faz os botões ocuparem o espaço disponível */
-            height: var(--button-height);
+            flex-grow: 1;
+            height: calc(var(--footer-height) - 4vh); /* Botões preenchem o rodapé */
             font-size: clamp(16px, 4vw, 20px);
             border-radius: 12px;
             border: 2px solid #007bff;
-            background: #007bff20; /* Fundo com transparência */
+            background: #007bff20;
             color: #fff;
             cursor: pointer;
             font-weight: bold;
@@ -134,9 +132,12 @@
         const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
         let model, webcam, maxPredictions;
         
-        // Variáveis para controlar o zoom
-        let currentZoom = 1;
-        let zoomCapabilities = null;
+        // Variáveis de controle de zoom
+        let zoomLevels = [];
+        let currentZoomIndex = 0;
+
+        // Variável para controlar a câmera atual
+        let isUsingFrontCamera = false;
 
         let alertaAtivo = false;
         let alertaTimeout = null;
@@ -148,7 +149,9 @@
             startButton.disabled = true;
             startButton.innerText = "Carregando...";
 
+            // Se a webcam já existe, significa que estamos trocando de câmera
             if (webcam) {
+                isUsingFrontCamera = !isUsingFrontCamera; // Inverte o estado da câmera
                 await webcam.stop();
                 const oldCanvas = document.querySelector('#webcam-container canvas');
                 if (oldCanvas) oldCanvas.remove();
@@ -168,27 +171,29 @@
                 }
             }
             
-            // Força o uso da câmera traseira em celulares
-            const flip = false; 
-            webcam = new tmImage.Webcam(360, 640, flip); // Resolução invertida para retrato
+            // Define se a imagem deve ser invertida (espelhada)
+            // true para câmera frontal, false para traseira
+            const flip = isUsingFrontCamera; 
+            const facingMode = isUsingFrontCamera ? "user" : "environment";
+            
+            webcam = new tmImage.Webcam(360, 640, flip);
             
             try {
-                await webcam.setup({
-                    facingMode: "environment" // 'environment' para câmera traseira
-                });
+                await webcam.setup({ facingMode: facingMode });
                 await webcam.play();
             } catch (e) {
                 console.error("Erro ao iniciar a câmera:", e);
+                isUsingFrontCamera = !isUsingFrontCamera; // Reverte o estado em caso de erro
                 startButton.innerText = "Erro na Câmera";
                 startButton.disabled = false;
-                alert("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
+                alert("Não foi possível acessar a câmera. Verifique as permissões.");
                 return;
             }
             
             window.requestAnimationFrame(loop);
 
             const webcamContainer = document.getElementById("webcam-container");
-            webcamContainer.innerHTML = ''; // Limpa container antes de adicionar
+            webcamContainer.innerHTML = '';
             webcamContainer.appendChild(webcam.canvas);
 
             await setupZoom();
@@ -203,9 +208,13 @@
             const track = webcam.stream.getVideoTracks()[0];
             try {
                 const capabilities = track.getCapabilities();
-                if (capabilities.zoom) {
-                    zoomCapabilities = capabilities.zoom;
-                    currentZoom = capabilities.zoom.min || 1;
+                // O zoom geralmente não é suportado na câmera frontal em muitos navegadores/dispositivos
+                if (capabilities.zoom && !isUsingFrontCamera) {
+                    const { min, max } = capabilities.zoom;
+                    zoomLevels = Array.from({length: 5}, (_, i) => min + i * (max - min) / 4);
+                    currentZoomIndex = 0;
+                    const currentZoom = zoomLevels[currentZoomIndex];
+                    
                     zoomButton.disabled = false;
                     zoomButton.innerText = `Zoom: ${currentZoom.toFixed(1)}X`;
                 } else {
@@ -220,27 +229,20 @@
         }
 
         function toggleZoom() {
-            if (!webcam || !webcam.stream || !zoomCapabilities) {
-                console.warn("Zoom não está disponível ou pronto.");
+            if (zoomLevels.length === 0) {
+                console.warn("Zoom não está disponível.");
                 return;
             }
             
-            const { min, max, step } = zoomCapabilities;
-
-            // Incrementa o zoom
-            currentZoom += step || 0.1; // Usa o 'step' da câmera ou um padrão
-
-            // Se o zoom passar do máximo, volta para o mínimo
-            if (currentZoom > max) {
-                currentZoom = min;
-            }
+            currentZoomIndex = (currentZoomIndex + 1) % zoomLevels.length;
+            const newZoomValue = zoomLevels[currentZoomIndex];
 
             const track = webcam.stream.getVideoTracks()[0];
             track.applyConstraints({
-                advanced: [{ zoom: currentZoom }]
+                advanced: [{ zoom: newZoomValue }]
             }).catch(e => console.error("Falha ao aplicar zoom:", e));
 
-            zoomButton.innerText = `Zoom: ${currentZoom.toFixed(1)}X`;
+            zoomButton.innerText = `Zoom: ${newZoomValue.toFixed(1)}X`;
         }
 
         async function loop() {
