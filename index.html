@@ -2,15 +2,14 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <!-- Viewport para garantir a responsividade em dispositivos móveis -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         :root {
-            /* Unidades de viewport para um layout mais consistente */
-            --camera-height: 60vh;
+            /* Área do vídeo reduzida em 30% (de 60vh para 42vh) */
+            --camera-height: 42vh;
             --alert-height: 10vh;
             --footer-height: 15vh;
         }
@@ -27,7 +26,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center; /* Centraliza o conteúdo */
+            justify-content: center;
         }
 
         #webcam-container {
@@ -56,7 +55,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(24px, 5vw, 36px); /* Fonte responsiva */
+            font-size: clamp(24px, 5vw, 36px);
             font-weight: bold;
             color: red;
             text-align: center;
@@ -82,18 +81,18 @@
             position: fixed;
             bottom: 0;
             display: flex;
-            justify-content: space-evenly;
+            /* Centraliza o botão único */
+            justify-content: center;
             align-items: center;
             padding: 0 10px;
             box-sizing: border-box;
             background: #000;
-            gap: 10px;
         }
 
         button {
-            flex-grow: 1;
+            width: 80%; /* Define uma largura para o botão único */
             height: calc(var(--footer-height) - 5vh);
-            font-size: clamp(16px, 4vw, 20px);
+            font-size: clamp(18px, 4.5vw, 22px);
             border-radius: 12px;
             border: 2px solid #007bff;
             background: #007bff20;
@@ -127,21 +126,15 @@
 
     <div class="footer-buttons">
         <button id="startButton" onclick="init()">Ligar Câmera</button>
-        <!-- Botão de Zoom adicionado para funcionalidade -->
-        <button id="zoomButton" onclick="toggleZoom()" disabled>Zoom</button>
     </div>
 
     <script type="text/javascript">
         const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
         let model, webcam, maxPredictions;
-        
-        let zoomLevels = [];
-        let currentZoomIndex = 0;
 
         let alertaAtivo = false;
         let alertaTimeout = null;
         const labelContainer = document.getElementById("label-container");
-        const zoomButton = document.getElementById("zoomButton");
         const startButton = document.getElementById("startButton");
 
         async function init() {
@@ -168,12 +161,10 @@
                 }
             }
             
-            // 'flip' é 'false' para não espelhar a câmera traseira
             const flip = false; 
             webcam = new tmImage.Webcam(360, 640, flip);
             
             try {
-                // Modo correto e mais compatível de solicitar a câmera traseira
                 await webcam.setup({ facingMode: "environment" });
                 await webcam.play();
             } catch (e) {
@@ -189,50 +180,9 @@
             const webcamContainer = document.getElementById("webcam-container");
             webcamContainer.innerHTML = '';
             webcamContainer.appendChild(webcam.canvas);
-
-            await setupZoom();
             
             startButton.innerText = "Reiniciar Câmera";
             startButton.disabled = false;
-        }
-
-        async function setupZoom() {
-            if (!webcam || !webcam.stream) return;
-
-            const track = webcam.stream.getVideoTracks()[0];
-            try {
-                const capabilities = track.getCapabilities();
-                if (capabilities.zoom) {
-                    const { min, max } = capabilities.zoom;
-                    zoomLevels = Array.from({length: 5}, (_, i) => min + i * (max - min) / 4);
-                    currentZoomIndex = 0;
-                    const currentZoom = zoomLevels[currentZoomIndex];
-                    
-                    zoomButton.disabled = false;
-                    zoomButton.innerText = `Zoom: ${currentZoom.toFixed(1)}X`;
-                } else {
-                    zoomButton.innerText = "Zoom N/A";
-                    zoomButton.disabled = true;
-                }
-            } catch (e) {
-                console.error("Não foi possível obter as capacidades de zoom:", e);
-                zoomButton.innerText = "Zoom Erro";
-                zoomButton.disabled = true;
-            }
-        }
-
-        function toggleZoom() {
-            if (zoomLevels.length <= 1) return;
-            
-            currentZoomIndex = (currentZoomIndex + 1) % zoomLevels.length;
-            const newZoomValue = zoomLevels[currentZoomIndex];
-
-            const track = webcam.stream.getVideoTracks()[0];
-            track.applyConstraints({
-                advanced: [{ zoom: newZoomValue }]
-            }).catch(e => console.error("Falha ao aplicar zoom:", e));
-
-            zoomButton.innerText = `Zoom: ${newZoomValue.toFixed(1)}X`;
         }
 
         async function loop() {
