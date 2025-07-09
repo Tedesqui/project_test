@@ -1,76 +1,58 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <title>Reconhecimento - Criminoso Classe A</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  <meta charset="UTF-8" />
+  <title>Correção de Provas AR + OCR + ChatGPT</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.1/dist/tesseract.min.js"></script>
+
   <style>
     body, html {
       margin: 0;
       padding: 0;
-      background-color: #000;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      height: 100%;
-      width: 100%;
+      font-family: sans-serif;
+      background: black;
+      color: white;
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
     }
-
-    #webcam-container {
+    video, canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
       width: 100vw;
-      height: 65vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #000;
-      position: relative;
-    }
-
-    #webcam-container canvas {
-      width: 100%;
-      height: 100%;
+      height: 100vh;
       object-fit: cover;
-      border: 10px solid green; /* Inicialmente verde */
-      border-radius: 12px;
-      box-sizing: border-box;
+      z-index: 0;
     }
-
-    #alerta {
-      margin-top: 10px;
-      font-size: 70px; /* Metade do tamanho anterior */
-      font-weight: bold;
-      color: red;
-      text-align: center;
-    }
-
-    #label-container {
-      display: none; /* Esconde nomes e probabilidades */
-    }
-
-    .footer-buttons {
+    #output {
+      position: fixed;
+      bottom: 0;
       width: 100%;
+      background: rgba(0,0,0,0.8);
+      padding: 10px;
+      font-size: 16px;
+      z-index: 2;
+      max-height: 40vh;
+      overflow-y: auto;
+    }
+    #controls {
       position: fixed;
       bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
       display: flex;
-      justify-content: center;
-      gap: 20px;
+      gap: 10px;
     }
-
     button {
-      padding: 20px 40px;
-      font-size: 24px;
-      border-radius: 10px;
+      font-size: 16px;
+      padding: 10px 16px;
+      background: #0d6efd;
       border: none;
-      background: #007bff;
-      color: #fff;
+      border-radius: 8px;
+      color: white;
       cursor: pointer;
     }
-
     button:hover {
       background: #0056b3;
     }
@@ -78,77 +60,83 @@
 </head>
 <body>
 
-  <div id="webcam-container"></div>
-  <div id="alerta"></div>
-  <div id="label-container"></div>
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
 
-  <div class="footer-buttons">
-    <button id="startButton" onclick="init()">Iniciar Câmera</button>
-    <button id="zoomButton" onclick="toggleZoom()">Zoom: 1X</button>
-  </div>
+<div id="controls">
+  <button id="zoomBtn" onclick="toggleZoom()">🔍 Zoom: 1x</button>
+  <button onclick="captureAndAnalyze()">📷 Corrigir</button>
+</div>
 
-  <script type="text/javascript">
-    const URL = "https://teachablemachine.withgoogle.com/models/BZaioL5ST/";
-    let model, webcam, maxPredictions;
-    let currentZoom = 1;
-    const zoomLevels = [1, 2, 3];
-    let alertaMostrado = false;
-    let bordaMudada = false;
+<div id="output">📷 Aponte a câmera para a resposta da prova e toque em "Corrigir"</div>
 
-    async function init() {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
+<script>
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  const output = document.getElementById("output");
+  const zoomBtn = document.getElementById("zoomBtn");
 
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
+  let mediaTrack;
+  let currentZoom = 1;
+  const zoomLevels = [1, 2, 3];
 
-        const flip = true; 
-        webcam = new tmImage.Webcam(640, 480, flip);
-        await webcam.setup();
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+  async function startCamera() {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { exact: "environment" },
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+      }
+    });
+    video.srcObject = stream;
+    mediaTrack = stream.getVideoTracks()[0];
+  }
 
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
+  async function toggleZoom() {
+    if (mediaTrack && mediaTrack.getCapabilities) {
+      const caps = mediaTrack.getCapabilities();
+      if (caps.zoom) {
+        const currentIndex = zoomLevels.indexOf(currentZoom);
+        currentZoom = zoomLevels[(currentIndex + 1) % zoomLevels.length];
 
-        document.getElementById("startButton").style.display = 'none';
-    }
-
-    function toggleZoom() {
-      currentZoom = zoomLevels[(zoomLevels.indexOf(currentZoom) + 1) % zoomLevels.length];
-      document.getElementById("zoomButton").innerText = `Zoom: ${currentZoom}X`;
-      const track = webcam.stream.getVideoTracks()[0];
-      const capabilities = track.getCapabilities();
-      if (capabilities.zoom) {
-        track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+        await mediaTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+        zoomBtn.innerText = `🔍 Zoom: ${currentZoom}x`;
+        output.innerText = `🔍 Zoom atual: ${currentZoom}x`;
+      } else {
+        output.innerText = "⚠️ Zoom não suportado neste dispositivo.";
       }
     }
+  }
 
-    async function loop() {
-        webcam.update();
-        await predict();
-        window.requestAnimationFrame(loop);
-    }
+  async function captureAndAnalyze() {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    async function predict() {
-        const prediction = await model.predict(webcam.canvas);
+    output.innerText = "🧠 Lendo resposta com OCR...";
 
-        for (let i = 0; i < maxPredictions; i++) {
-            const className = prediction[i].className;
-            const prob = prediction[i].probability;
+    const { data: { text } } = await Tesseract.recognize(canvas, 'por', {
+      logger: m => console.log(m)
+    });
 
-            if (className.toLowerCase().includes("jean") && prob > 0.7) {
-                if (!alertaMostrado) {
-                    document.getElementById("alerta").innerHTML = "🚨 JEAN TEDESQUI, CRIMINOSO CLASSE A, CONDENADO A 50 ANOS, STATUS ATUAL: FORAGIDO! 🚨";
-                    alertaMostrado = true;
-                }
-                if (!bordaMudada) {
-                    document.querySelector('#webcam-container canvas').style.border = '10px solid red';
-                    bordaMudada = true;
-                }
-            }
-        }
-    }
-  </script>
+    output.innerText = "🔎 Texto detectado:\n" + text + "\n\nEnviando para IA...";
+
+    // Chamada para backend seguro na Vercel
+    const response = await fetch("https://SEU-BACKEND.vercel.app/api/corrigir", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ texto: text })
+    });
+
+    const data = await response.json();
+    output.innerText = "✅ Correção:\n" + data.resultado;
+  }
+
+  startCamera();
+</script>
 
 </body>
 </html>
