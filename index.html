@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento Facial Smartphone</title>
+  <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Smartphone Camera</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
   <style>
@@ -41,7 +41,7 @@
 
     #alerta {
       margin-top: 10px;
-      font-size: 52px; /* 200% maior */
+      font-size: 60px;
       font-weight: bold;
       color: red;
       text-align: center;
@@ -55,7 +55,7 @@
       background: rgba(0,0,0,0.7);
       padding: 10px 14px;
       border-radius: 8px;
-      font-size: 14px;
+      font-size: 16px;
       max-width: 90%;
       z-index: 10;
     }
@@ -117,23 +117,33 @@
         maxPredictions = model.getTotalClasses();
       }
 
-      const constraints = {
-        video: {
-          facingMode: { ideal: "environment" }, // CORREÇÃO: ideal em vez de exact
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      };
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        let rearCameraId = null;
 
-      cameraStream = new tmImage.Webcam(640, 480, true, constraints);
-      await cameraStream.setup();
-      await cameraStream.play();
-      window.requestAnimationFrame(detectLoop);
+        videoDevices.forEach(device => {
+          if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trás') || device.label.toLowerCase().includes('rear')) {
+            rearCameraId = device.deviceId;
+          }
+        });
 
-      const cameraContainer = document.getElementById("camera-container");
-      cameraContainer.appendChild(cameraStream.canvas);
+        const constraints = {
+          video: rearCameraId ? { deviceId: { exact: rearCameraId } } : { facingMode: { ideal: "environment" } }
+        };
 
-      cameraStream.canvas.style.border = '8px solid green';
+        cameraStream = new tmImage.Webcam(640, 480, true, constraints);
+        await cameraStream.setup();
+        await cameraStream.play();
+        window.requestAnimationFrame(detectLoop);
+
+        const cameraContainer = document.getElementById("camera-container");
+        cameraContainer.appendChild(cameraStream.canvas);
+
+        cameraStream.canvas.style.border = '8px solid green';
+      } catch (err) {
+        alert("Erro ao acessar a câmera traseira: " + err);
+      }
     }
 
     async function detectLoop() {
