@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         :root {
-            /* Definindo proporções da tela com unidades de viewport height (vh) */
             --camera-height: 80vh;
             --alert-height: 7vh;
             --footer-height: 13vh;
@@ -31,7 +30,7 @@
 
         #webcam-container {
             width: 100vw;
-            height: var(--camera-height); /* Altura aumentada */
+            height: var(--camera-height);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -43,7 +42,8 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
-            border: 8px solid green;
+            /* Borda reduzida em 50% */
+            border: 4px solid green;
             border-radius: 16px;
             box-sizing: border-box;
             transition: border-color 0.5s ease;
@@ -54,7 +54,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: clamp(22px, 5vw, 36px);
+            /* Tamanho da fonte do alerta reduzido em 50% */
+            font-size: clamp(11px, 2.5vw, 18px);
             font-weight: bold;
             color: red;
             text-align: center;
@@ -90,7 +91,7 @@
 
         button {
             flex-grow: 1;
-            height: calc(var(--footer-height) - 4vh); /* Botões preenchem o rodapé */
+            height: calc(var(--footer-height) - 4vh);
             font-size: clamp(16px, 4vw, 20px);
             border-radius: 12px;
             border: 2px solid #007bff;
@@ -129,15 +130,12 @@
     </div>
 
     <script type="text/javascript">
-        const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
+        const URL = "https://teachablemachine.withgoogle.com/models/HkmN_erTY/";
         let model, webcam, maxPredictions;
         
         // Variáveis de controle de zoom
         let zoomLevels = [];
         let currentZoomIndex = 0;
-
-        // Variável para controlar a câmera atual
-        let isUsingFrontCamera = false;
 
         let alertaAtivo = false;
         let alertaTimeout = null;
@@ -149,9 +147,7 @@
             startButton.disabled = true;
             startButton.innerText = "Carregando...";
 
-            // Se a webcam já existe, significa que estamos trocando de câmera
             if (webcam) {
-                isUsingFrontCamera = !isUsingFrontCamera; // Inverte o estado da câmera
                 await webcam.stop();
                 const oldCanvas = document.querySelector('#webcam-container canvas');
                 if (oldCanvas) oldCanvas.remove();
@@ -171,10 +167,10 @@
                 }
             }
             
-            // Define se a imagem deve ser invertida (espelhada)
-            // true para câmera frontal, false para traseira
-            const flip = isUsingFrontCamera; 
-            const facingMode = isUsingFrontCamera ? "user" : "environment";
+            // A imagem não é invertida (flip = false)
+            const flip = false; 
+            // O modo de câmera é sempre 'environment' (traseira)
+            const facingMode = "environment";
             
             webcam = new tmImage.Webcam(360, 640, flip);
             
@@ -183,7 +179,6 @@
                 await webcam.play();
             } catch (e) {
                 console.error("Erro ao iniciar a câmera:", e);
-                isUsingFrontCamera = !isUsingFrontCamera; // Reverte o estado em caso de erro
                 startButton.innerText = "Erro na Câmera";
                 startButton.disabled = false;
                 alert("Não foi possível acessar a câmera. Verifique as permissões.");
@@ -198,7 +193,8 @@
 
             await setupZoom();
             
-            startButton.innerText = "Trocar Câmera";
+            // O botão agora serve para reiniciar a câmera
+            startButton.innerText = "Reiniciar Câmera";
             startButton.disabled = false;
         }
 
@@ -208,8 +204,7 @@
             const track = webcam.stream.getVideoTracks()[0];
             try {
                 const capabilities = track.getCapabilities();
-                // O zoom geralmente não é suportado na câmera frontal em muitos navegadores/dispositivos
-                if (capabilities.zoom && !isUsingFrontCamera) {
+                if (capabilities.zoom) {
                     const { min, max } = capabilities.zoom;
                     zoomLevels = Array.from({length: 5}, (_, i) => min + i * (max - min) / 4);
                     currentZoomIndex = 0;
