@@ -12,31 +12,59 @@
       background-color: #000;
       color: #fff;
       font-family: Arial, sans-serif;
-      text-align: center;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #webcam-container {
+      width: 100vw;
+      height: 65vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #000;
+      position: relative;
     }
 
     #webcam-container canvas {
-      width: 100vw !important;
-      height: auto !important;
-    }
-
-    #label-container {
-      margin-top: 20px;
-      font-size: 22px;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border: 10px solid green;
+      border-radius: 12px;
+      box-sizing: border-box;
     }
 
     #alerta {
-      margin-top: 20px;
-      font-size: 28px;
+      margin-top: 10px;
+      font-size: 70px;
       font-weight: bold;
       color: red;
+      text-align: center;
+    }
+
+    #label-container {
+      display: none;
+    }
+
+    .footer-buttons {
+      width: 100%;
+      position: fixed;
+      bottom: 10px;
+      display: flex;
+      justify-content: center;
+      gap: 20px;
     }
 
     button {
-      margin-top: 15px;
-      padding: 10px 20px;
-      font-size: 20px;
-      border-radius: 8px;
+      padding: 20px 40px;
+      font-size: 24px;
+      border-radius: 10px;
       border: none;
       background: #007bff;
       color: #fff;
@@ -50,38 +78,66 @@
 </head>
 <body>
 
-  <h2>Teachable Machine - Vigilância</h2>
-  <button type="button" onclick="init()">Iniciar</button>
-
   <div id="webcam-container"></div>
-  <div id="label-container"></div>
   <div id="alerta"></div>
+  <div id="label-container"></div>
+
+  <div class="footer-buttons">
+    <button id="startButton" onclick="init()">Iniciar Câmera</button>
+    <button id="zoomButton" onclick="toggleZoom()">Zoom: 1X</button>
+  </div>
 
   <script type="text/javascript">
     const URL = "https://teachablemachine.withgoogle.com/models/BZaioL5ST/";
-    let model, webcam, labelContainer, maxPredictions;
+    let model, webcam, maxPredictions;
+    let currentZoom = 1;
+    const zoomLevels = [1, 2, 3];
+    let alertaAtivo = false;
 
     async function init() {
+      const startBtn = document.getElementById("startButton");
+      startBtn.innerText = "Atualizar Câmera";
+
+      if (webcam) {
+        await webcam.stop();
+        const oldCanvas = document.querySelector('#webcam-container canvas');
+        if (oldCanvas) oldCanvas.remove();
+        alertaAtivo = false;
+        document.getElementById("alerta").innerHTML = "";
+      }
+
+      if (!model) {
         const modelURL = URL + "model.json";
         const metadataURL = URL + "metadata.json";
-
         model = await tmImage.load(modelURL, metadataURL);
         maxPredictions = model.getTotalClasses();
+      }
 
-        const flip = true; 
-        webcam = new tmImage.Webcam(640, 480, flip); // maior tamanho
-        await webcam.setup();
-        await webcam.play();
-        window.requestAnimationFrame(loop);
+      webcam = new tmImage.Webcam(640, 480, true);
+      await webcam.setup();
+      await webcam.play();
+      window.requestAnimationFrame(loop);
 
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) {
-            labelContainer.appendChild(document.createElement("div"));
-        }
+      const webcamContainer = document.getElementById("webcam-container");
+      webcamContainer.appendChild(webcam.canvas);
+
+      webcam.canvas.style.border = '10px solid green';
     }
 
-    async function loop() {
+    function toggleZoom() {
+      if (!webcam) return;
+
+      currentZoom = zoomLevels[(zoomLevels.indexOf(currentZoom) + 1) % zoomLevels.length];
+      document.getElementById("zoomButton").innerText = `Zoom: ${currentZoom}X`;
+
+      const track = webcam.stream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
+      if (capabilities.zoom) {
+        track.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+      }
+    }
+
+   async function loop() {
         webcam.update();
         await predict();
         window.requestAnimationFrame(loop);
