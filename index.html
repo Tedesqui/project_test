@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Smartphone Camera</title>
+  <title>𝐀𝐑𝐑𝐄𝐒𝐓 - Reconhecimento</title>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
   <style>
@@ -22,7 +22,7 @@
 
     #camera-container {
       width: 100vw;
-      height: 60vh;
+      height: 65vh;
       display: flex;
       justify-content: center;
       align-items: center;
@@ -34,18 +34,18 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      border: 8px solid green;
+      border: 10px solid green;
       border-radius: 12px;
       box-sizing: border-box;
     }
 
     #alerta {
       margin-top: 10px;
-      font-size: 60px;
+      font-size: 120px;
       font-weight: bold;
       color: red;
       text-align: center;
-      min-height: 60px;
+      min-height: 100px;
     }
 
     #label-container {
@@ -53,7 +53,7 @@
       top: 10px;
       left: 10px;
       background: rgba(0,0,0,0.7);
-      padding: 10px 14px;
+      padding: 10px 15px;
       border-radius: 8px;
       font-size: 16px;
       max-width: 90%;
@@ -66,10 +66,11 @@
       bottom: 20px;
       display: flex;
       justify-content: center;
+      gap: 20px;
     }
 
-    #startButton {
-      padding: 36px 72px;
+    button {
+      padding: 50px 100px;
       font-size: 48px;
       border-radius: 12px;
       border: none;
@@ -78,7 +79,7 @@
       cursor: pointer;
     }
 
-    #startButton:hover {
+    button:hover {
       background: #0056b3;
     }
   </style>
@@ -90,21 +91,24 @@
   <div id="label-container"></div>
 
   <div class="footer-buttons">
-    <button id="startButton" onclick="startCamera()">Iniciar Câmera</button>
+    <button id="startButton" onclick="startCamera()">Iniciar/Atualizar Câmera</button>
+    <button id="switchButton" onclick="switchCamera()">Alternar Câmera</button>
   </div>
 
   <script type="text/javascript">
     const URL = "https://teachablemachine.withgoogle.com/models/cePpr2QeE/";
-    let model, cameraStream, maxPredictions;
+    let model, camera, maxPredictions;
     let alertaAtivo = false;
     let alertaTimeout = null;
+    let useFrontCamera = false;
+
     const labelContainer = document.getElementById("label-container");
 
     async function startCamera() {
       document.getElementById("startButton").innerText = "Atualizar Câmera";
 
-      if (cameraStream) {
-        await cameraStream.stop();
+      if (camera) {
+        await camera.stop();
         const oldCanvas = document.querySelector('#camera-container canvas');
         if (oldCanvas) oldCanvas.remove();
         clearAlert();
@@ -117,54 +121,49 @@
         maxPredictions = model.getTotalClasses();
       }
 
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
-        let rearCameraId = null;
+      const constraints = {
+        video: {
+          facingMode: useFrontCamera ? 'user' : { exact: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
 
-        videoDevices.forEach(device => {
-          if (device.label.toLowerCase().includes('back') || device.label.toLowerCase().includes('trás') || device.label.toLowerCase().includes('rear')) {
-            rearCameraId = device.deviceId;
-          }
-        });
+      camera = new tmImage.Webcam(640, 480, true, constraints);
+      await camera.setup();
+      await camera.play();
+      window.requestAnimationFrame(detectLoop);
 
-        const constraints = {
-          video: rearCameraId ? { deviceId: { exact: rearCameraId } } : { facingMode: { ideal: "environment" } }
-        };
+      const cameraContainer = document.getElementById("camera-container");
+      cameraContainer.appendChild(camera.canvas);
 
-        cameraStream = new tmImage.Webcam(640, 480, true, constraints);
-        await cameraStream.setup();
-        await cameraStream.play();
-        window.requestAnimationFrame(detectLoop);
+      camera.canvas.style.border = '10px solid green';
+    }
 
-        const cameraContainer = document.getElementById("camera-container");
-        cameraContainer.appendChild(cameraStream.canvas);
-
-        cameraStream.canvas.style.border = '8px solid green';
-      } catch (err) {
-        alert("Erro ao acessar a câmera traseira: " + err);
-      }
+    function switchCamera() {
+      useFrontCamera = !useFrontCamera;
+      startCamera();
     }
 
     async function detectLoop() {
-      if (cameraStream) {
-        cameraStream.update();
-        await detectFaces();
+      if (camera) {
+        camera.update();
+        await predict();
         window.requestAnimationFrame(detectLoop);
       }
     }
 
-    async function detectFaces() {
-      if (!model || !cameraStream) return;
+    async function predict() {
+      if (!model || !camera) return;
 
-      const predictions = await model.predict(cameraStream.canvas);
-      const canvas = document.querySelector('#camera-container canvas');
+      const prediction = await model.predict(camera.canvas);
       const alertaDiv = document.getElementById("alerta");
+      const canvas = document.querySelector('#camera-container canvas');
 
       labelContainer.innerHTML = "";
       let tedesquiDetectado = false;
 
-      predictions.forEach(p => {
+      prediction.forEach(p => {
         const probText = `${p.className}: ${(p.probability * 100).toFixed(1)}%`;
         const div = document.createElement('div');
         div.innerText = probText;
@@ -177,7 +176,7 @@
 
       if (tedesquiDetectado && !alertaAtivo) {
         alertaDiv.innerHTML = "🚨 ALERTA: TEDESQUI DETECTADO! 🚨";
-        canvas.style.border = '8px solid red';
+        canvas.style.border = '10px solid red';
         alertaAtivo = true;
 
         clearTimeout(alertaTimeout);
@@ -191,14 +190,14 @@
       const alertaDiv = document.getElementById("alerta");
       const canvas = document.querySelector('#camera-container canvas');
       alertaDiv.innerHTML = "";
-      if (canvas) canvas.style.border = '8px solid green';
+      if (canvas) canvas.style.border = '10px solid green';
       alertaAtivo = false;
       clearTimeout(alertaTimeout);
     }
 
     window.addEventListener('beforeunload', () => {
       clearAlert();
-      if (cameraStream) cameraStream.stop();
+      if (camera) camera.stop();
     });
   </script>
 
